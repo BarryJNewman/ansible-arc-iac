@@ -1,0 +1,17 @@
+---
+- name: Ensure the Arc demo directory exists with the correct permissions
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+  tasks:
+    - name: Ensure /opt/arc-demo is a root-owned directory with mode 0755
+      ansible.builtin.file:
+        path: /opt/arc-demo
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+        follow: false
+        recurse: false
