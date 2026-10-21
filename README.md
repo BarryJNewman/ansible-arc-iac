@@ -26,9 +26,19 @@ sudo apt-get update
 sudo apt-get install -y ansible-core python3 coreutils
 ```
 
-For Azure Linux/RHEL, use your distribution's available repositories and package
-manager instead. Verify that these exact paths exist (the wrapper intentionally
-uses a fixed executable path):
+On Azure Linux 3.0, the live demo uses an isolated Python environment because
+`ansible-core` was not available in the configured RPM repositories:
+
+```bash
+sudo tdnf install -y python3-pip
+sudo python3 -m venv /opt/arc-ansible-demo/venv
+sudo /opt/arc-ansible-demo/venv/bin/python -m pip install ansible-core==2.21.5
+# Only create this link when no Ansible executable is already installed there.
+sudo ln -s /opt/arc-ansible-demo/venv/bin/ansible-playbook /usr/bin/ansible-playbook
+```
+
+Verify that these exact paths exist (the wrapper intentionally uses a fixed
+executable path):
 
 ```bash
 /usr/bin/ansible-playbook --version
@@ -66,6 +76,16 @@ Optional direct Ansible syntax check on the Linux host:
 ```bash
 ansible-playbook -i 'localhost,' --syntax-check modules/ArcAnsibleDemo/ensure-directory.yml
 ```
+
+The standalone DSC resource checks can run on the Arc node using its bundled
+PowerShell runtime. Copy this repository to the node, then run from its root:
+
+```bash
+sudo /opt/GC_Service/GC/pwsh -NoProfile -File tests/Test-Resource.ps1
+```
+
+This checks temporary directories, permission drift, symlink rejection and the
+demo's path restriction. It does not create or change `/opt/arc-demo`.
 
 ## 3. Test the package on a disposable Linux demo host
 
@@ -127,6 +147,25 @@ creating an Azure Policy definition. In the portal, open your Arc server's
 **Machine Configuration** page and refresh to find the manual assignment.
 Agent processing and compliance reporting are asynchronous.
 
+### Managed identity alternative (used by the live Azure Linux demo)
+
+If storage policy disables shared-key access, use Microsoft Entra authentication
+to upload (`--auth-mode login`) and grant the Arc machine's system-assigned
+identity **Storage Blob Data Reader** on the package container. The build/upload
+identity needs **Storage Blob Data Contributor** on that container. Uploads and
+downloads also need network access to storage, such as a private endpoint with
+private DNS for both hosts.
+
+Use a plain blob URL without a SAS, then enable identity-based package access:
+
+```powershell
+$contentUri = "https://$storageAccount.blob.core.windows.net/$container/$blob"
+./assign.ps1 -MachineResourceId $machineId -ContentUri $contentUri -ContentHash (Get-Content ./out/content-sha256.txt).Trim() -UseSystemAssignedIdentity
+```
+
+This sets `contentManagedIdentity` to `system`; there is no SAS expiration to
+renew. Allow time for new Azure role assignments to propagate.
+
 ## 6. Show drift and repair
 
 On the Arc node, first confirm the applied state:
@@ -164,7 +203,15 @@ longer needed. Removing an assignment does not undo previously applied settings.
 - [Microsoft: assignments for Arc resources](https://learn.microsoft.com/en-us/azure/governance/machine-configuration/how-to/assign-configuration/rest-api)
 - [Microsoft: Connected Machine agent components](https://learn.microsoft.com/en-us/azure/azure-arc/servers/agent-overview)
 
-The source was authored on macOS, where PowerShell, Ansible, and a supported
-Machine Configuration test runtime were unavailable. YAML parsing was checked;
-MOF compilation, ZIP generation, Linux remediation, and Azure deployment must
-be verified using the steps above before presenting the live demo.
+Validated on October 21, 2026:
+
+- MOF compilation and `AuditAndSet` ZIP generation on Ubuntu 24.04 with PowerShell
+  7.6.7, PSDesiredStateConfiguration 3.0.0-beta1, and GuestConfiguration.
+- ZIP inspection confirmed the Ansible playbook is bundled with its module.
+- DSC discovery and resource checks passed using the Arc agent's bundled
+  PowerShell on Azure Linux 3.0: missing directory, correct mode/ownership,
+  permission drift, symlink rejection, and rejection of unrelated paths.
+- Package publication succeeded over a private endpoint using managed identity.
+
+These checks are separate from the live agent's compliance report; check the
+assignment and on-disk state before presenting the live demo.

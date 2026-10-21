@@ -1,7 +1,8 @@
 param(
     [Parameter(Mandatory)] [string] $MachineResourceId,
     [Parameter(Mandatory)] [uri] $ContentUri,
-    [Parameter(Mandatory)] [ValidatePattern('^[A-Fa-f0-9]{64}$')] [string] $ContentHash
+    [Parameter(Mandatory)] [ValidatePattern('^[A-Fa-f0-9]{64}$')] [string] $ContentHash,
+    [switch] $UseSystemAssignedIdentity
 )
 $ErrorActionPreference = 'Stop'
 if ($MachineResourceId -notmatch '^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\.HybridCompute/machines/[^/]+$') {
@@ -23,10 +24,13 @@ $body = @{
         }
     }
 }
+if ($UseSystemAssignedIdentity) {
+    $body.properties.guestConfiguration.contentManagedIdentity = 'system'
+}
 $temporaryFile = [IO.Path]::GetTempFileName()
 try {
     $body | ConvertTo-Json -Depth 8 | Set-Content -Path $temporaryFile
-    $url = "https://management.azure.com$MachineResourceId/providers/Microsoft.GuestConfiguration/guestConfigurationAssignments/ArcAnsibleDirectoryDemo?api-version=2022-01-25"
+    $url = "https://management.azure.com$MachineResourceId/providers/Microsoft.GuestConfiguration/guestConfigurationAssignments/ArcAnsibleDirectoryDemo?api-version=2024-04-05"
     & az rest --method put --url $url --body "@$temporaryFile" --output json
     if ($LASTEXITCODE -ne 0) { throw 'Guest configuration assignment failed.' }
 } finally {

@@ -2,7 +2,9 @@
 # Prerequisite installation commands are in README.md.
 $ErrorActionPreference = 'Stop'
 if (-not $IsLinux) { throw 'Build this Linux demo on Ubuntu, not macOS or Windows.' }
-Import-Module PSDesiredStateConfiguration -RequiredVersion '3.0.0-beta1'
+# PowerShellGet installs the prerelease as 3.0.0-beta1, but Import-Module
+# accepts the numeric manifest version rather than a prerelease suffix.
+Import-Module PSDesiredStateConfiguration -RequiredVersion '3.0.0'
 Import-Module GuestConfiguration
 $env:PSModulePath = (Join-Path $PSScriptRoot 'modules') + [IO.Path]::PathSeparator + $env:PSModulePath
 . (Join-Path $PSScriptRoot 'configuration.ps1')

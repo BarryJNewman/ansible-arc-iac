@@ -5,7 +5,9 @@
     Author = 'Arc demo'
     PowerShellVersion = '7.2'
     DscResourcesToExport = @('ArcDemoDirectory')
-    FunctionsToExport = @()
+    # Force module analysis so Get-Module -ListAvailable discovers the DSC class.
+    # This module defines no functions, so the wildcard exports no functions.
+    FunctionsToExport = @('*')
     CmdletsToExport = @()
     VariablesToExport = @()
     AliasesToExport = @()

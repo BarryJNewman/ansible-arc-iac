@@ -3,7 +3,7 @@ class ArcDemoDirectory {
     [DscProperty(Key)]
     [string] $Path
 
-    [DscProperty(NotConfig)]
+    [DscProperty(NotConfigurable)]
     [string] $CurrentState
 
     [string] ReadState() {
