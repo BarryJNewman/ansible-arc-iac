@@ -9,7 +9,10 @@ try {
     if ($r.Test()) { throw 'A missing directory must not be compliant.' }
     $null = New-Item -Path $path -ItemType Directory
     Set-Acl -LiteralPath $path -AclObject $r.DesiredAcl()
-    if (-not $r.Test()) { throw 'The desired ACL must be compliant.' }
+    if (-not $r.Test()) {
+        $expected = $r.DesiredAcl().GetSecurityDescriptorSddlForm([System.Security.AccessControl.AccessControlSections]::Access)
+        throw "The desired ACL must be compliant. Expected: $expected Actual: $($r.ReadState())"
+    }
     if ($r.Get().CurrentState -cne $r.ReadState()) { throw 'Get returned incorrect state.' }
     $acl = Get-Acl -LiteralPath $path
     $rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
