@@ -1,0 +1,49 @@
+name: Windows DSC demo
+on:
+  push:
+    paths:
+      - 'windows/**'
+      - 'assign.ps1'
+      - '.github/workflows/windows-dsc.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build-and-test:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test directory resource
+        shell: pwsh
+        run: ./windows/tests/Test-Resource.ps1
+      - name: Install authoring modules
+        shell: pwsh
+        run: |
+          Install-Module PSDesiredStateConfiguration -RequiredVersion 2.0.7 -Scope CurrentUser -Force
+          Install-Module GuestConfiguration -Scope CurrentUser -Force
+      - name: Build Machine Configuration package
+        shell: pwsh
+        run: ./windows/build.ps1
+      - name: Test the packaged resource and repair drift
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Import-Module GuestConfiguration
+          $package = (Resolve-Path ./windows/out/ArcWindowsDirectoryDemo.zip).Path
+          Start-GuestConfigurationPackageRemediation -Path $package -Verbose
+          $result = Get-GuestConfigurationPackageComplianceStatus -Path $package
+          if (-not $result.ComplianceStatus) { throw 'Initial package remediation failed.' }
+          $acl = Get-Acl C:\ArcDemo
+          $acl.SetAccessRuleProtection($false, $true)
+          Set-Acl C:\ArcDemo $acl
+          $result = Get-GuestConfigurationPackageComplianceStatus -Path $package
+          if ($result.ComplianceStatus) { throw 'ACL drift was not detected.' }
+          Start-GuestConfigurationPackageRemediation -Path $package -Verbose
+          $result = Get-GuestConfigurationPackageComplianceStatus -Path $package
+          if (-not $result.ComplianceStatus) { throw 'Package failed to repair ACL drift.' }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ArcWindowsDirectoryDemo
+          path: |
+            windows/out/ArcWindowsDirectoryDemo.zip
+            windows/out/content-sha256.txt

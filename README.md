@@ -1,5 +1,8 @@
 # Arc Machine Configuration + Ansible directory demo
 
+For a native Windows DSC directory and permissions example, see
+[the Windows demo](windows/README.md).
+
 Ensures `/opt/arc-demo` is a directory owned by `root:root` with mode `0755`.
 The DSC resource checks the actual directory type, numeric UID/GID and mode.
 Its `Set()` method invokes the bundled Ansible playbook locally as root.
@@ -212,6 +215,8 @@ Validated on October 21, 2026:
   PowerShell on Azure Linux 3.0: missing directory, correct mode/ownership,
   permission drift, symlink rejection, and rejection of unrelated paths.
 - Package publication succeeded over a private endpoint using managed identity.
+- The live `ApplyAndAutoCorrect` assignment on an Azure Linux 3.0 Arc node
+  completed its first configuration run and reported **Compliant** to Azure.
 
 These checks are separate from the live agent's compliance report; check the
 assignment and on-disk state before presenting the live demo.

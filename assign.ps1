@@ -2,7 +2,9 @@ param(
     [Parameter(Mandatory)] [string] $MachineResourceId,
     [Parameter(Mandatory)] [uri] $ContentUri,
     [Parameter(Mandatory)] [ValidatePattern('^[A-Fa-f0-9]{64}$')] [string] $ContentHash,
-    [switch] $UseSystemAssignedIdentity
+    [switch] $UseSystemAssignedIdentity,
+    [ValidateSet('ArcAnsibleDirectoryDemo', 'ArcWindowsDirectoryDemo')]
+    [string] $ConfigurationName = 'ArcAnsibleDirectoryDemo'
 )
 $ErrorActionPreference = 'Stop'
 if ($MachineResourceId -notmatch '^/subscriptions/[^/]+/resourceGroups/[^/]+/providers/Microsoft\.HybridCompute/machines/[^/]+$') {
@@ -12,11 +14,14 @@ if ($ContentUri.Scheme -ne 'https') { throw 'ContentUri must use HTTPS.' }
 $machineJson = & az resource show --ids $MachineResourceId --output json
 if ($LASTEXITCODE -ne 0) { throw 'Unable to read the Arc machine. Check az login and the resource ID.' }
 $machine = ($machineJson -join "`n") | ConvertFrom-Json
+if ($ConfigurationName -eq 'ArcWindowsDirectoryDemo' -and $machine.properties.osType -ine 'windows') {
+    throw 'The Windows demo requires a Windows Arc machine.'
+}
 $body = @{
     location = $machine.location
     properties = @{
         guestConfiguration = @{
-            name = 'ArcAnsibleDirectoryDemo'
+            name = $ConfigurationName
             version = '1.0.0'
             contentUri = $ContentUri.AbsoluteUri
             contentHash = $ContentHash
@@ -30,7 +35,7 @@ if ($UseSystemAssignedIdentity) {
 $temporaryFile = [IO.Path]::GetTempFileName()
 try {
     $body | ConvertTo-Json -Depth 8 | Set-Content -Path $temporaryFile
-    $url = "https://management.azure.com$MachineResourceId/providers/Microsoft.GuestConfiguration/guestConfigurationAssignments/ArcAnsibleDirectoryDemo?api-version=2024-04-05"
+    $url = "https://management.azure.com$MachineResourceId/providers/Microsoft.GuestConfiguration/guestConfigurationAssignments/${ConfigurationName}?api-version=2024-04-05"
     & az rest --method put --url $url --body "@$temporaryFile" --output json
     if ($LASTEXITCODE -ne 0) { throw 'Guest configuration assignment failed.' }
 } finally {
