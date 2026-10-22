@@ -38,7 +38,16 @@ class ArcWindowsDirectory {
     [bool] Test() {
         $expected = $this.DesiredAcl().GetSecurityDescriptorSddlForm(
             [System.Security.AccessControl.AccessControlSections]::Access)
-        return $this.ReadState() -ceq $expected
+        $current = $this.ReadState()
+        if (-not $current.StartsWith('D:')) { return $false }
+        # Windows can add AI/AR bookkeeping flags when writing an ACL. They
+        # do not change access rules; retain the protected-DACL flag itself.
+        $descriptor = [System.Security.AccessControl.RawSecurityDescriptor]::new($current)
+        $ignored = [System.Security.AccessControl.ControlFlags]::DiscretionaryAclAutoInherited -bor
+            [System.Security.AccessControl.ControlFlags]::DiscretionaryAclAutoInheritRequired
+        $descriptor.SetFlags($descriptor.ControlFlags -band (-bnot $ignored))
+        return $descriptor.GetSddlForm(
+            [System.Security.AccessControl.AccessControlSections]::Access) -ceq $expected
     }
 
     [void] Set() {
